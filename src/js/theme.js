@@ -14,7 +14,7 @@ const colorSets = [
 function preloadImages() {
   for (let i = 0; i < images.length; i++) {
     const img = new Image();
-    img.src = "../src/images/cover2.webp";
+    img.src = "src/images/cover2.webp";
   }
 }
 
@@ -29,7 +29,7 @@ function updateColors() {
 updateColors(currentIndex);
 
 // Set the initial image
-document.getElementById("carouselImage").src = "../src/images/cover2.webp";
+document.getElementById("carouselImage").src = "src/images/cover2.webp";
 
 // Image is opacity 0 and text is translated off screen by default
 // Add the loaded class to the image and text to animate them in
