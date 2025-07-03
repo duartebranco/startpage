@@ -6,7 +6,7 @@ It uses the colors from `colors.css` which is the generated file from [pywal](ht
 Every time you use pywal, you must copy the file (or create a symlink) from `.cache/wal/colors.css` to the `src/theme/colors.css` to update the colors.
 
 It also shows the `wallpaper.[extension]` image at the left, which I put as my wallpaper.
-So, it's also needed to copy or make a symlink from your curent wallpaper path to `src/theme/wallpaper.[extension]`.
+So, it's also needed to copy or make a symlink from your curent wallpaper's path to `src/theme/wallpaper.[extension]`.
 
 I also made a searchbox who redirects to Google.
 
