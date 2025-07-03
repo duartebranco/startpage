@@ -7,9 +7,6 @@ const fallbackColors = {
     "--background-color": "#426491",
 };
 
-// Common image extensions to look for
-const imageExtensions = ["jpg", "jpeg", "png", "webp", "gif", "svg"];
-
 function getColorsFromCSS() {
     // Get the computed CSS variables from the document
     const rootStyles = getComputedStyle(document.documentElement);
@@ -37,6 +34,66 @@ function getColorsFromCSS() {
     }
 }
 
+async function checkBookmarksExists() {
+    try {
+        const response = await fetch("bookmarks.html");
+
+        // Check if the response is successful AND actually contains HTML content
+        if (response.ok) {
+            const text = await response.text();
+            // Check if it's actually HTML content (not a 404 page or error)
+            if (
+                text.includes("<!doctype html") ||
+                text.includes("<html") ||
+                text.includes("bookmark")
+            ) {
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.log("⚠️ Bookmarks file not found:", error);
+        return false;
+    }
+}
+
+async function makeImageClickableIfBookmarksExists() {
+    const imageElement = document.getElementById("carouselImage");
+    const imageContainer = document.getElementById("image");
+
+    if (!imageElement || !imageContainer) {
+        console.log("⚠️ Image elements not found");
+        return;
+    }
+
+    const bookmarksExists = await checkBookmarksExists();
+
+    if (bookmarksExists) {
+        console.log("✅ Bookmarks file found - making image clickable");
+
+        // Create an anchor element and wrap the image
+        const anchor = document.createElement("a");
+        anchor.href = "bookmarks.html";
+
+        // Remove the image from its current parent
+        imageElement.parentNode.removeChild(imageElement);
+
+        // Add the image to the anchor
+        anchor.appendChild(imageElement);
+
+        // Add the anchor to the image container
+        imageContainer.appendChild(anchor);
+
+        // Add some styling to indicate it's clickable
+        imageElement.style.cursor = "pointer";
+        imageElement.title = "Click to view bookmarks";
+    } else {
+        console.log(
+            "⚠️ Bookmarks file not found - image will not be clickable",
+        );
+    }
+}
+
 async function loadCarouselImage() {
     const imageElement = document.getElementById("carouselImage");
     const imageContainer = document.getElementById("image");
@@ -46,44 +103,61 @@ async function loadCarouselImage() {
         return;
     }
 
-    // Try to find images in the theme folder
-    for (const ext of imageExtensions) {
-        try {
-            const imagePath = `src/theme/wallpaper.${ext}`;
+    try {
+        // Priority order: png first, then jpg, then other common formats
+        const imageExtensions = [
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+            "bmp",
+            "svg",
+        ];
+        let foundWallpaper = null;
 
-            // Create a test image to check if the file exists
-            const testImg = new Image();
+        // Try each extension in priority order
+        for (const ext of imageExtensions) {
+            const testPath = `src/theme/wallpaper.${ext}`;
 
-            await new Promise((resolve, reject) => {
-                testImg.onload = () => {
-                    console.log(`✅ Found image: ${imagePath}`);
-                    imageElement.src = imagePath;
-                    imageElement.style.opacity = "0";
-                    imageElement.style.transition = "opacity 0.3s ease";
+            try {
+                const testImg = new Image();
 
-                    // Fade in the image
-                    setTimeout(() => {
-                        imageElement.style.opacity = "1";
-                    }, 100);
+                await new Promise((resolve, reject) => {
+                    testImg.onload = () => {
+                        foundWallpaper = testPath;
+                        resolve();
+                    };
+                    testImg.onerror = () => reject();
+                    testImg.src = testPath;
+                });
 
-                    resolve();
-                };
-
-                testImg.onerror = () => reject();
-                testImg.src = imagePath;
-            });
-
-            // If we get here, we found an image
-            return;
-        } catch (error) {
-            // Continue to next extension
-            continue;
+                // If we reach here, we found a valid wallpaper
+                break;
+            } catch (error) {
+                // Continue to next extension
+                continue;
+            }
         }
-    }
 
-    // If no image found, hide the container
-    console.log("⚠️ No wallpaper image found in theme folder");
-    imageContainer.style.display = "none";
+        if (foundWallpaper) {
+            console.log(`✅ Found wallpaper: ${foundWallpaper}`);
+            imageElement.src = foundWallpaper;
+            imageElement.style.opacity = "0";
+            imageElement.style.transition = "opacity 0.3s ease";
+
+            // Fade in the image
+            setTimeout(() => {
+                imageElement.style.opacity = "1";
+            }, 100);
+        } else {
+            throw new Error("No wallpaper file found");
+        }
+    } catch (error) {
+        // If no wallpaper found, hide the container
+        console.log("⚠️ No wallpaper file found in theme folder");
+        imageContainer.style.display = "none";
+    }
 }
 
 function updateColors() {
@@ -115,5 +189,8 @@ window.onload = function () {
 
     // Apply colors and load image
     updateColors();
-    loadCarouselImage();
+    loadCarouselImage().then(() => {
+        // After the image is loaded, check if we should make it clickable
+        makeImageClickableIfBookmarksExists();
+    });
 };
