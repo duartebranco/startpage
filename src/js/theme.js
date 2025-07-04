@@ -7,6 +7,29 @@ const fallbackColors = {
     "--background-color": "#426491",
 };
 
+// Cache keys
+const CACHE_KEYS = {
+    BOOKMARKS_EXISTS: "startpage_bookmarks_exists",
+    WALLPAPER_PATH: "startpage_wallpaper_path",
+    CACHE_TIMESTAMP: "startpage_cache_timestamp",
+};
+
+// Cache duration (5 minutes)
+const CACHE_DURATION = 5 * 60 * 1000;
+
+function isCacheValid() {
+    const timestamp = localStorage.getItem(CACHE_KEYS.CACHE_TIMESTAMP);
+    if (!timestamp) return false;
+
+    const now = Date.now();
+    const cacheTime = parseInt(timestamp, 10);
+    return now - cacheTime < CACHE_DURATION;
+}
+
+function updateCacheTimestamp() {
+    localStorage.setItem(CACHE_KEYS.CACHE_TIMESTAMP, Date.now().toString());
+}
+
 function getColorsFromCSS() {
     // Get the computed CSS variables from the document
     const rootStyles = getComputedStyle(document.documentElement);
@@ -35,24 +58,36 @@ function getColorsFromCSS() {
 }
 
 async function checkBookmarksExists() {
-    try {
-        const response = await fetch("bookmarks.html");
-
-        // Check if the response is successful AND actually contains HTML content
-        if (response.ok) {
-            const text = await response.text();
-            // Check if it's actually HTML content (not a 404 page or error)
-            if (
-                text.includes("<!doctype html") ||
-                text.includes("<html") ||
-                text.includes("bookmark")
-            ) {
-                return true;
-            }
+    // Check cache first
+    if (isCacheValid()) {
+        const cached = localStorage.getItem(CACHE_KEYS.BOOKMARKS_EXISTS);
+        if (cached !== null) {
+            console.log("📋 Using cached bookmarks status:", cached === "true");
+            return cached === "true";
         }
-        return false;
+    }
+
+    try {
+        const response = await fetch("bookmarks.html", {
+            cache: "force-cache", // Use cached version if available
+            method: "HEAD", // Only get headers, not full content
+        });
+
+        const exists = response.ok;
+
+        // Cache the result
+        localStorage.setItem(CACHE_KEYS.BOOKMARKS_EXISTS, exists.toString());
+        updateCacheTimestamp();
+
+        console.log("📋 Bookmarks check result (cached):", exists);
+        return exists;
     } catch (error) {
         console.log("⚠️ Bookmarks file not found:", error);
+
+        // Cache the negative result too
+        localStorage.setItem(CACHE_KEYS.BOOKMARKS_EXISTS, "false");
+        updateCacheTimestamp();
+
         return false;
     }
 }
@@ -103,6 +138,22 @@ async function loadCarouselImage() {
         return;
     }
 
+    // Check cache first
+    if (isCacheValid()) {
+        const cachedPath = localStorage.getItem(CACHE_KEYS.WALLPAPER_PATH);
+        if (cachedPath) {
+            console.log(`🖼️ Using cached wallpaper: ${cachedPath}`);
+            imageElement.src = cachedPath;
+            imageElement.style.opacity = "0";
+            imageElement.style.transition = "opacity 0.3s ease";
+
+            setTimeout(() => {
+                imageElement.style.opacity = "1";
+            }, 100);
+            return;
+        }
+    }
+
     try {
         // Priority order: png first, then jpg, then other common formats
         const imageExtensions = [
@@ -142,6 +193,11 @@ async function loadCarouselImage() {
 
         if (foundWallpaper) {
             console.log(`✅ Found wallpaper: ${foundWallpaper}`);
+
+            // Cache the found wallpaper path
+            localStorage.setItem(CACHE_KEYS.WALLPAPER_PATH, foundWallpaper);
+            updateCacheTimestamp();
+
             imageElement.src = foundWallpaper;
             imageElement.style.opacity = "0";
             imageElement.style.transition = "opacity 0.3s ease";
@@ -156,6 +212,11 @@ async function loadCarouselImage() {
     } catch (error) {
         // If no wallpaper found, hide the container
         console.log("⚠️ No wallpaper file found in theme folder");
+
+        // Cache the fact that no wallpaper was found
+        localStorage.setItem(CACHE_KEYS.WALLPAPER_PATH, "");
+        updateCacheTimestamp();
+
         imageContainer.style.display = "none";
     }
 }
